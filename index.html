@@ -1,6 +1,4 @@
-<!-- index.html: Static SMVP page -->
-<!DOCTYPE html>
-<html lang="en">
+<!-- index.html: Static SMVP page --><!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
   <title>Vocabulary SMVP</title>
@@ -19,7 +17,7 @@
     /* Sidebar */
     #sidebar { width: 260px; background: var(--sidebar-bg); overflow-y:auto; padding: 1rem; }
     .word-item { padding: .5rem .75rem; border-radius: 8px; cursor: pointer; transition: background .2s; }
-    .word-item:hover { background: var(--highlight); }  
+    .word-item:hover { background: var(--highlight); }
     .word-item.active { background: var(--accent); color:#fff; }
     /* Main content */
     #main { flex:1; padding: 2rem 3rem; overflow-y: auto; }
@@ -41,11 +39,7 @@
   <div id="app">
     <div id="sidebar"></div>
     <div id="main"><p>Select a word to begin.</p></div>
-  </div>
-
-  <!-- sql.js (SQLite compiled to WASM) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>
-  <script>
+  </div>  <!-- sql.js (SQLite compiled to WASM) -->  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-wasm.js"></script>  <script>
     (async () => {
       // 1. Load sql.js
       const SQL = await initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/${f}` });
@@ -82,7 +76,11 @@
         const [[term, translation, audioBlob]] = db.exec(`SELECT term, translation, audio_data FROM words WHERE id=${wordId}`)[0].values;
         // Examples & conv
         const sentences = db.exec(`SELECT text, translation, audio_data FROM examples WHERE word_id=${wordId}`)[0]?.values || [];
-        const conv      = db.exec(`SELECT speaker_label, text, translation, audio_data, line_order FROM conversation_lines WHERE word_id=${wordId} ORDER BY line_order`)[0]?.values || [];
+        const convRows = db.exec(
+          "SELECT conversation_id, speaker_label, text, translation, audio_data" +
+          " FROM conversation_lines WHERE word_id=" + wordId +
+          " ORDER BY conversation_id, line_order"
+        )[0]?.values || [];
         // Clips now returns [youtube_url, start_sec]
         const clips     = db.exec(`SELECT youtube_url, start_sec FROM clips WHERE word_id=${wordId}`)[0]?.values || [];
 
@@ -107,17 +105,32 @@
         }
 
         // Conversation
-        if (conv.length) {
-          const st = document.createElement('div'); st.className='section-title'; st.textContent='Conversation';
+        if (convRows.length) {
+          const st = document.createElement('div');
+          st.className = 'section-title';
+          st.textContent = 'Conversation';
           main.appendChild(st);
-          const wrap = document.createElement('div'); wrap.className='conv-container';
-          conv.forEach(([speaker, txt, tr, aud]) => {
-            const b = document.createElement('div'); b.className=`conv-bubble ${speaker==='A'?'left':'right'}`;
-            b.innerHTML = `${txt}<small>${tr}</small><button class="audio-btn">▶</button>`;
-            b.querySelector('button').onclick = () => playAudio(aud);
-            wrap.appendChild(b);
+
+          let currentConv = null;
+          let wrapper;
+
+          convRows.forEach(([convId, speaker, txt, tr, aud]) => {
+            if (convId !== currentConv) {
+              currentConv = convId;
+              wrapper = document.createElement('div');
+              wrapper.className = 'conv-container';
+              main.appendChild(wrapper);
+            }
+            const bubble = document.createElement('div');
+            bubble.className = `conv-bubble ${speaker === 'A' ? 'left' : 'right'}`;
+            bubble.innerHTML = `
+              ${txt}
+              <small>${tr}</small>
+              <button class="audio-btn">▶</button>
+            `;
+            wrapper.appendChild(bubble);
+            bubble.querySelector('button').onclick = () => playAudio(aud);
           });
-          main.appendChild(wrap);
         }
 
         // Videos (now using only the ID)
@@ -143,6 +156,5 @@
         new Audio(url).play();
       }
     })();
-  </script>
-</body>
+  </script></body>
 </html>
